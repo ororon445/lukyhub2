@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lucky Wheel & Games</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+
+        :root {
+            --bg-dark: #0f172a;
+            --accent-yellow: #f59e0b;
+        }
+
+        body {
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+            font-family: 'Montserrat', sans-serif;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        /* Full Screen & Responsive Containers */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        .tab-content {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            animation: fadeIn 0.4s ease-out;
+            width: 100%;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* Wheel Scaling */
+        .wheel-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 1/1;
+            margin: 0 auto;
+        }
+
+        canvas#wheelCanvas {
+            width: 100% !important;
+            height: 100% !important;
+            border-radius: 50%;
+            transition: transform 5s cubic-bezier(0.15, 0, 0.15, 1);
+        }
+
+        #pointer {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 40px;
+            background: #ef4444;
+            clip-path: polygon(50% 100%, 0 0, 100% 0);
+            z-index: 10;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+        }
+
+        .center-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 20;
+            border: 4px solid var(--bg-dark);
+            font-weight: 900;
+            color: var(--bg-dark);
+            box-shadow: 0 0 20px rgba(255,255,255,0.2);
+            font-size: 12px;
+        }
+
+        /* Snake & Checkers Scaling */
+        .game-container {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 1.5rem;
+            padding: 1rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        #snakeCanvas {
+            width: 100% !important;
+            height: auto !important;
+            aspect-ratio: 1/1;
+            background: #020617;
+            border-radius: 0.75rem;
+        }
+
+        .checkers-board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            width: 100%;
+            aspect-ratio: 1/1;
+            border: 4px solid #1e293b;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .cell { aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .cell.dark { background-color: #1e293b; }
+        .cell.light { background-color: #334155; }
+        
+        .piece {
+            width: 80%;
+            height: 80%;
+            border-radius: 50%;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+        }
+        .piece.red { background: radial-gradient(circle at 30% 30%, #ff4d4d, #991b1b); }
+        .piece.white { background: radial-gradient(circle at 30% 30%, #f8fafc, #64748b); }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="w-full bg-slate-900/80 backdrop-blur-xl border-b border-white/5 px-4 py-3 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <!-- Universal Logo -->
+            <div class="flex items-center gap-3 group cursor-default select-none">
+                <div class="relative w-10 h-10 transition-transform group-hover:scale-110 duration-300">
+                    <div class="absolute inset-0 bg-yellow-500 rounded-lg transform rotate-6 opacity-80"></div>
+                    <div class="absolute inset-0 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg transform -rotate-3 flex items-center justify-center shadow-lg border border-white/10">
+                        <span class="text-xl">🎲</span>
+                    </div>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-xl font-black tracking-widest text-white leading-none">LUCKY<span class="text-yellow-500">HUB</span></span>
+                    <span class="text-[10px] text-gray-400 font-medium tracking-[0.3em] uppercase mt-1">EST. 2026</span>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex gap-1 bg-white/5 p-1 rounded-xl overflow-x-auto max-w-full">
+                <button onclick="switchTab('wheel')" id="btn-wheel" class="tab-btn px-4 py-2 rounded-lg text-xs font-bold transition bg-yellow-500 text-black">WHEEL</button>
+                <button onclick="switchTab('guess')" id="btn-guess" class="tab-btn px-4 py-2 rounded-lg text-xs font-bold transition text-gray-400 hover:text-white">NUMBERS</button>
+                <button onclick="switchTab('snake')" id="btn-snake" class="tab-btn px-4 py-2 rounded-lg text-xs font-bold transition text-gray-400 hover:text-white">SNAKE</button>
+                <button onclick="switchTab('checkers')" id="btn-checkers" class="tab-btn px-4 py-2 rounded-lg text-xs font-bold transition text-gray-400 hover:text-white">CHECKERS</button>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- Fortune Wheel -->
+        <div id="tab-wheel" class="tab-content active items-center justify-center py-4">
+            <h1 class="text-2xl md:text-4xl font-black mb-6 text-center text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 uppercase tracking-tighter">Fortune Wheel</h1>
+            <div class="flex flex-col xl:flex-row items-center justify-center gap-8 w-full">
+                <div class="wheel-wrapper">
+                    <div id="pointer"></div>
+                    <div class="center-button" onclick="spinWheel()">SPIN</div>
+                    <canvas id="wheelCanvas"></canvas>
+                </div>
+                
+                <div class="w-full max-w-sm bg-white/5 p-6 rounded-2xl border border-white/10">
+                    <h2 class="text-lg font-bold mb-4 text-yellow-500 uppercase tracking-widest">Prizes</h2>
+                    <div id="prize-list" class="space-y-2 mb-4 max-h-48 overflow-y-auto"></div>
+                    <div class="flex gap-2">
+                        <input type="text" id="new-prize-name" placeholder="Add prize..." class="bg-white/10 border-0 rounded-lg px-4 py-3 flex-grow focus:ring-2 focus:ring-yellow-500 text-white text-sm outline-none">
+                        <button onclick="addPrize()" class="bg-yellow-500 text-black font-black px-6 rounded-lg hover:bg-yellow-400 transition">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Guess Number -->
+        <div id="tab-guess" class="tab-content items-center justify-center py-8">
+            <div class="game-container text-center py-12">
+                <h1 class="text-3xl font-black mb-2 text-blue-400 uppercase italic">Magic Number</h1>
+                <p class="text-gray-400 mb-10 text-sm">Pick a number between 1 and 100</p>
+                
+                <div id="game-zone">
+                    <input type="number" id="user-guess" placeholder="?" class="w-32 bg-transparent border-b-4 border-blue-500 text-6xl text-center py-2 mb-10 outline-none font-black text-white">
+                    <button onclick="checkGuess()" class="block w-full bg-blue-600 py-4 rounded-xl font-black text-lg hover:bg-blue-500 transition shadow-lg shadow-blue-900/20">GUESS IT!</button>
+                    <div id="guess-hint" class="mt-8 text-xl font-bold text-blue-300 min-h-[1.5em] uppercase italic"></div>
+                </div>
+
+                <div id="win-zone" class="hidden">
+                    <div class="text-6xl mb-4">🏆</div>
+                    <h2 class="text-3xl font-black text-green-400 mb-6">BINGO!</h2>
+                    <p class="text-white/60 mb-8">It took you <span id="attempts-count" class="text-white font-bold">0</span> tries.</p>
+                    <button onclick="resetGuessGame()" class="w-full bg-green-600 py-4 rounded-xl font-black hover:bg-green-500 transition">REPLAY</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Snake Game -->
+        <div id="tab-snake" class="tab-content items-center justify-center py-4">
+            <div class="game-container max-w-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-black text-emerald-500 italic">NEON SNAKE</h2>
+                    <div class="bg-emerald-500/20 px-3 py-1 rounded-full text-emerald-400 font-bold text-sm">Score: <span id="snake-score">0</span></div>
+                </div>
+                
+                <canvas id="snakeCanvas" width="400" height="400"></canvas>
+                
+                <div class="mt-6 grid grid-cols-3 gap-3 w-40 mx-auto sm:hidden">
+                    <div></div><button ontouchstart="handleSnakeControl('UP')" class="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center">▲</button><div></div>
+                    <button ontouchstart="handleSnakeControl('LEFT')" class="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center">◀</button>
+                    <button ontouchstart="handleSnakeControl('DOWN')" class="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center">▼</button>
+                    <button ontouchstart="handleSnakeControl('RIGHT')" class="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center">▶</button>
+                </div>
+
+                <button id="snake-start-btn" onclick="startSnakeGame()" class="mt-6 w-full bg-emerald-600 py-4 rounded-xl font-black uppercase tracking-widest hover:bg-emerald-500 transition">Start Game</button>
+                <p class="hidden sm:block text-[10px] text-gray-500 mt-4 text-center">Use Arrow Keys to control</p>
+            </div>
+        </div>
+
+        <!-- Checkers -->
+        <div id="tab-checkers" class="tab-content items-center justify-center py-4">
+            <div class="game-container">
+                <div class="flex justify-between items-center mb-4">
+                    <div id="turn-indicator" class="text-sm font-black uppercase tracking-tighter">Turn: <span class="text-red-500">Player</span></div>
+                    <button onclick="resetCheckers()" class="text-[10px] bg-white/10 px-2 py-1 rounded uppercase font-bold">Reset</button>
+                </div>
+                <div id="checkersBoard" class="checkers-board"></div>
+                <div id="game-status" class="mt-4 text-center text-[10px] text-gray-500 uppercase italic">Multi-jump sequence enabled</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Unified Footer -->
+    <footer class="w-full bg-black/40 border-t border-white/5 py-6 px-6">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex items-center gap-3 opacity-60 grayscale hover:grayscale-0 transition duration-500">
+                <div class="relative w-8 h-8">
+                    <div class="absolute inset-0 bg-yellow-500 rounded-lg transform rotate-6"></div>
+                    <div class="absolute inset-0 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg transform -rotate-3 flex items-center justify-center">
+                        <span class="text-sm">🎲</span>
+                    </div>
+                </div>
+                <span class="text-sm font-black tracking-widest">LUCKY<span class="text-yellow-500">HUB</span></span>
+            </div>
+            
+            <div class="text-center md:text-right">
+                <p class="text-gray-500 text-[10px] uppercase tracking-widest mb-1">&copy; 2026 LuckyHub Digital</p>
+                <p class="text-gray-600 text-[9px]">Optimized for Mobile, Tablet and Desktop devices</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Universal Modal -->
+    <div id="winModal" class="modal">
+        <div class="bg-slate-900 border border-white/10 p-10 rounded-3xl text-center max-w-xs w-full shadow-2xl">
+            <div class="text-5xl mb-4">✨</div>
+            <h2 class="text-xl font-black mb-1 uppercase tracking-tighter">Winner!</h2>
+            <div id="winnerName" class="text-3xl font-black text-yellow-500 mb-8 break-words leading-tight uppercase italic"></div>
+            <button onclick="closeModal()" class="w-full bg-white text-black py-4 rounded-xl font-black hover:bg-yellow-500 transition uppercase text-sm">Collect</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Core Application Logic ---
+        function switchTab(tab) {
+            stopSnakeGame();
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('bg-yellow-500', 'text-black');
+                b.classList.add('text-gray-400');
+            });
+            
+            document.getElementById('tab-' + tab).classList.add('active');
+            const btn = document.getElementById('btn-' + tab);
+            btn.classList.add('bg-yellow-500', 'text-black');
+            btn.classList.remove('text-gray-400');
+            
+            if(tab === 'wheel') setTimeout(drawWheel, 10);
+            if(tab === 'checkers') resetCheckers();
+        }
+
+        // --- Wheel Logic ---
+        const wheelCanvas = document.getElementById('wheelCanvas');
+        const wheelCtx = wheelCanvas.getContext('2d');
+        let prizes = [
+            { name: "Jackpot", color: "#f59e0b" }, { name: "Free Spin", color: "#3b82f6" },
+            { name: "Gift Card", color: "#ef4444" }, { name: "Nothing", color: "#334155" },
+            { name: "Bonus", color: "#10b981" }, { name: "Sticker", color: "#8b5cf6" }
+        ];
+        let isSpinning = false;
+        let currentRotation = 0;
+
+        function drawWheel() {
+            const size = wheelCanvas.parentElement.offsetWidth;
+            if(!size) return;
+            const dpr = window.devicePixelRatio || 1;
+            wheelCanvas.width = size * dpr;
+            wheelCanvas.height = size * dpr;
+            wheelCtx.scale(dpr, dpr);
+            
+            const radius = size / 2 - 10;
+            const centerX = size / 2, centerY = size / 2;
+            const sliceAngle = (Math.PI * 2) / prizes.length;
+
+            prizes.forEach((prize, i) => {
+                wheelCtx.beginPath();
+                wheelCtx.moveTo(centerX, centerY);
+                wheelCtx.arc(centerX, centerY, radius, i * sliceAngle, (i + 1) * sliceAngle);
+                wheelCtx.fillStyle = prize.color;
+                wheelCtx.fill();
+                wheelCtx.strokeStyle = "rgba(0,0,0,0.2)";
+                wheelCtx.lineWidth = 2;
+                wheelCtx.stroke();
+
+                wheelCtx.save();
+                wheelCtx.translate(centerX, centerY);
+                wheelCtx.rotate(i * sliceAngle + sliceAngle / 2);
+                wheelCtx.textAlign = "right";
+                wheelCtx.fillStyle = "white";
+                wheelCtx.font = `900 ${size/12}px Montserrat`;
+                wheelCtx.fillText(prize.name.toUpperCase(), radius - 20, 10);
+                wheelCtx.restore();
+            });
+        }
+
+        function spinWheel() {
+            if (isSpinning) return;
+            isSpinning = true;
+            const extraSpins = 5 + Math.random() * 5;
+            const rotation = extraSpins * 360 + Math.floor(Math.random() * 360);
+            currentRotation += rotation;
+            wheelCanvas.style.transform = `rotate(${currentRotation}deg)`;
+            
+            setTimeout(() => {
+                isSpinning = false;
+                const actualRotation = currentRotation % 360;
+                const sliceDegree = 360 / prizes.length;
+                const winningIndex = Math.floor((360 - (actualRotation % 360) + 270) % 360 / sliceDegree);
+                document.getElementById('winnerName').innerText = prizes[winningIndex].name;
+                document.getElementById('winModal').style.display = 'flex';
+            }, 5000);
+        }
+
+        function renderPrizeList() {
+            const list = document.getElementById('prize-list');
+            list.innerHTML = prizes.map((p, i) => `
+                <div class="flex items-center justify-between bg-white/5 px-3 py-2 rounded-lg group">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full" style="background:${p.color}"></div>
+                        <span class="text-xs font-bold uppercase">${p.name}</span>
+                    </div>
+                    <button onclick="removePrize(${i})" class="text-white/20 hover:text-red-500 transition font-black">&times;</button>
+                </div>
+            `).join('');
+        }
+
+        function addPrize() {
+            const input = document.getElementById('new-prize-name');
+            const val = input.value.trim();
+            if(val && prizes.length < 12) {
+                prizes.push({ name: val, color: `hsl(${Math.random() * 360}, 70%, 45%)` });
+                input.value = '';
+                renderPrizeList(); drawWheel();
+            }
+        }
+
+        function removePrize(i) {
+            if(prizes.length > 2) { prizes.splice(i, 1); renderPrizeList(); drawWheel(); }
+        }
+
+        function closeModal() { document.getElementById('winModal').style.display = 'none'; }
+
+        // --- Guess Number ---
+        let secret, attempts;
+        function resetGuessGame() {
+            secret = Math.floor(Math.random() * 100) + 1;
+            attempts = 0;
+            document.getElementById('game-zone').classList.remove('hidden');
+            document.getElementById('win-zone').classList.add('hidden');
+            document.getElementById('guess-hint').innerText = '';
+        }
+
+        function checkGuess() {
+            const input = document.getElementById('user-guess');
+            const val = parseInt(input.value);
+            if(isNaN(val)) return;
+            attempts++;
+            if(val === secret) {
+                document.getElementById('game-zone').classList.add('hidden');
+                document.getElementById('win-zone').classList.remove('hidden');
+                document.getElementById('attempts-count').innerText = attempts;
+            } else {
+                document.getElementById('guess-hint').innerText = val < secret ? "Try Higher ⬆️" : "Try Lower ⬇️";
+            }
+            input.value = '';
+        }
+
+        // --- Snake ---
+        const sCanvas = document.getElementById('snakeCanvas');
+        const sCtx = sCanvas.getContext('2d');
+        let snake = [], apple = {}, sDx = 20, sDy = 0, sLoop = null;
+
+        function startSnakeGame() {
+            stopSnakeGame();
+            snake = [{x: 100, y: 100}, {x: 80, y: 100}];
+            sDx = 20; sDy = 0;
+            spawnApple();
+            document.getElementById('snake-score').innerText = '0';
+            document.getElementById('snake-start-btn').innerText = 'Restart';
+            sLoop = setInterval(moveSnake, 120);
+        }
+
+        function spawnApple() {
+            apple = { 
+                x: Math.floor(Math.random() * (sCanvas.width/20)) * 20, 
+                y: Math.floor(Math.random() * (sCanvas.height/20)) * 20 
+            };
+        }
+
+        function moveSnake() {
+            const head = { x: snake[0].x + sDx, y: snake[0].y + sDy };
+            if(head.x < 0 || head.x >= 400 || head.y < 0 || head.y >= 400 || snake.some(s => s.x === head.x && s.y === head.y)) {
+                stopSnakeGame();
+                alert('CRASHED!');
+                return;
+            }
+            snake.unshift(head);
+            if(head.x === apple.x && head.y === apple.y) {
+                spawnApple();
+                document.getElementById('snake-score').innerText = (snake.length - 2) * 10;
+            } else {
+                snake.pop();
+            }
+            drawSnake();
+        }
+
+        function drawSnake() {
+            sCtx.fillStyle = '#020617';
+            sCtx.fillRect(0,0,400,400);
+            sCtx.fillStyle = '#ef4444';
+            sCtx.beginPath();
+            sCtx.arc(apple.x+10, apple.y+10, 8, 0, Math.PI*2);
+            sCtx.fill();
+            snake.forEach((p, i) => {
+                sCtx.fillStyle = i === 0 ? '#34d399' : '#059669';
+                sCtx.fillRect(p.x+1, p.y+1, 18, 18);
+            });
+        }
+
+        function stopSnakeGame() { clearInterval(sLoop); sLoop = null; }
+
+        function handleSnakeControl(dir) {
+            if(dir === 'UP' && sDy === 0) { sDx = 0; sDy = -20; }
+            if(dir === 'DOWN' && sDy === 0) { sDx = 0; sDy = 20; }
+            if(dir === 'LEFT' && sDx === 0) { sDx = -20; sDy = 0; }
+            if(dir === 'RIGHT' && sDx === 0) { sDx = 20; sDy = 0; }
+        }
+
+        window.addEventListener('keydown', e => {
+            if(e.key === 'ArrowUp') handleSnakeControl('UP');
+            if(e.key === 'ArrowDown') handleSnakeControl('DOWN');
+            if(e.key === 'ArrowLeft') handleSnakeControl('LEFT');
+            if(e.key === 'ArrowRight') handleSnakeControl('RIGHT');
+        });
+
+        // --- Checkers ---
+        const cBoard = document.getElementById('checkersBoard');
+        let board = [], selected = null, turn = 'red', moves = [];
+
+        function resetCheckers() {
+            board = Array(8).fill(null).map(() => Array(8).fill(null));
+            turn = 'red'; selected = null;
+            for(let r=0; r<3; r++) for(let c=(r%2?0:1); c<8; c+=2) board[r][c] = {color:'white', king:false};
+            for(let r=5; r<8; r++) for(let c=(r%2?0:1); c<8; c+=2) board[r][c] = {color:'red', king:false};
+            renderCheckers();
+        }
+
+        function renderCheckers() {
+            cBoard.innerHTML = '';
+            document.getElementById('turn-indicator').innerHTML = `Turn: <span class="${turn==='red'?'text-red-500':'text-gray-300'}">${turn.toUpperCase()}</span>`;
+            for(let r=0; r<8; r++) {
+                for(let c=0; c<8; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = `cell ${(r+c)%2?'dark':'light'}`;
+                    if(selected?.r === r && selected?.c === c) cell.classList.add('bg-yellow-500/40');
+                    if(moves.some(m => m.r === r && m.c === c)) cell.classList.add('ring-2 ring-inset ring-green-500');
+                    const p = board[r][c];
+                    if(p) {
+                        const div = document.createElement('div');
+                        div.className = `piece ${p.color} ${p.king?'ring-2 ring-yellow-400':''}`;
+                        if(p.king) div.innerHTML = '<span class="flex items-center justify-center h-full text-[10px]">👑</span>';
+                        cell.appendChild(div);
+                    }
+                    cell.onclick = () => handleCheckerClick(r,c);
+                    cBoard.appendChild(cell);
+                }
+            }
+        }
+
+        function handleCheckerClick(r, c) {
+            const move = moves.find(m => m.r === r && m.c === c);
+            if(move) {
+                executeCheckerMove(selected.r, selected.c, r, c, move);
+            } else {
+                const p = board[r][c];
+                if(p?.color === turn) {
+                    selected = {r, c};
+                    moves = getCheckerMoves(r, c);
+                } else {
+                    selected = null; moves = [];
+                }
+            }
+            renderCheckers();
+        }
+
+        function executeCheckerMove(fR, fC, tR, tC, m) {
+            const p = board[fR][fC];
+            board[tR][tC] = p;
+            board[fR][fC] = null;
+            if(m.jump) board[m.jump.r][m.jump.c] = null;
+            if((p.color==='red' && tR===0) || (p.color==='white' && tR===7)) p.king = true;
+            turn = turn === 'red' ? 'white' : 'red';
+            selected = null; moves = [];
+            if(turn === 'white') setTimeout(botMove, 600);
+        }
+
+        function getCheckerMoves(r, c) {
+            const p = board[r][c];
+            const ms = [];
+            const dirs = p.king ? [[1,1],[1,-1],[-1,1],[-1,-1]] : (p.color==='red'?[[-1,1],[-1,-1]]:[[1,1],[1,-1]]);
+            dirs.forEach(([dr, dc]) => {
+                const nR = r+dr, nC = c+dc;
+                if(nR>=0 && nR<8 && nC>=0 && nC<8) {
+                    if(!board[nR][nC]) ms.push({r:nR, c:nC});
+                    else if(board[nR][nC].color !== p.color) {
+                        const jR = nR+dr, jC = nC+dc;
+                        if(jR>=0 && jR<8 && jC>=0 && jC<8 && !board[jR][jC]) ms.push({r:jR, c:jC, jump:{r:nR, c:nC}});
+                    }
+                }
+            });
+            return ms;
+        }
+
+        function botMove() {
+            const allMoves = [];
+            for(let r=0; r<8; r++) for(let c=0; c<8; c++) {
+                if(board[r][c]?.color === 'white') {
+                    getCheckerMoves(r, c).forEach(m => allMoves.push({fR:r, fC:c, tR:m.r, tC:m.c, m}));
+                }
+            }
+            if(allMoves.length) {
+                const jumps = allMoves.filter(m => m.m.jump);
+                const pick = jumps.length ? jumps[0] : allMoves[Math.floor(Math.random()*allMoves.length)];
+                executeCheckerMove(pick.fR, pick.fC, pick.tR, pick.tC, pick.m);
+                renderCheckers();
+            }
+        }
+
+        window.onresize = drawWheel;
+        window.onload = () => { renderPrizeList(); drawWheel(); resetGuessGame(); resetCheckers(); };
+    </script>
+</body>
+</html>
